@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>移动充电服务 - 静态部署版</title>
+    <link rel="stylesheet" href="styles.css">
+    <meta name="description" content="便捷的移动充电服务，提供充电站查找、预约、充电状态监控等功能">
+    <meta name="keywords" content="充电站,电动车,充电服务,预约充电">
+    <!-- 添加PWA支持 -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4CAF50">
+</head>
+<body>
+    <!-- 加载状态覆盖层 -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">正在加载...</div>
+    </div>
+
+    <!-- 消息提示 -->
+    <div class="message" id="message"></div>
+
+    <!-- 头部导航 -->
+    <header class="header">
+        <div class="header-content">
+            <h1 class="logo">⚡ 充电站</h1>
+            <div class="header-actions">
+                <button class="icon-btn" id="notification-btn" title="通知">
+                    <span class="icon">🔔</span>
+                    <span class="badge" id="notification-badge">3</span>
+                </button>
+                <button class="icon-btn" id="user-menu-btn" title="用户菜单">
+                    <span class="icon">👤</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主要内容区域 -->
+    <main class="main-content">
+        <!-- 首页 -->
+        <section id="home-page" class="page active">
+            <div class="page-content">
+                <div class="search-section">
+                    <div class="search-bar">
+                        <input type="text" id="search-input" placeholder="搜索充电站..." class="search-input">
+                        <button class="search-btn" id="search-btn">搜索</button>
+                    </div>
+                    <div class="filter-options">
+                        <button class="filter-btn active" data-filter="all">全部</button>
+                        <button class="filter-btn" data-filter="available">可用</button>
+                        <button class="filter-btn" data-filter="fast">快充</button>
+                    </div>
+                </div>
+
+                <div class="quick-actions">
+                    <button class="action-card" id="nearby-stations-btn">
+                        <span class="action-icon">📍</span>
+                        <span class="action-text">附近充电站</span>
+                    </button>
+                    <button class="action-card" id="reservation-btn">
+                        <span class="action-icon">📅</span>
+                        <span class="action-text">我的预约</span>
+                    </button>
+                    <button class="action-card" id="charging-status-btn">
+                        <span class="action-icon">⚡</span>
+                        <span class="action-text">充电状态</span>
+                    </button>
+                    <button class="action-card" id="recommendation-btn">
+                        <span class="action-icon">🌟</span>
+                        <span class="action-text">智能推荐</span>
+                    </button>
+                </div>
+
+                <div class="nearby-stations">
+                    <h2>附近充电站</h2>
+                    <div class="station-list" id="nearby-stations-list">
+                        <!-- 充电站列表将在这里动态加载 -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 地图页面 -->
+        <section id="map-page" class="page">
+            <div class="page-content">
+                <div class="map-container">
+                    <div class="map-placeholder" id="map-placeholder">
+                        <div class="map-icon">🗺️</div>
+                        <p>地图加载中...</p>
+                        <p class="map-note">在实际应用中，这里会显示交互式地图</p>
+                    </div>
+                    <div class="map-controls">
+                        <button class="map-control-btn" id="locate-btn">定位</button>
+                        <button class="map-control-btn" id="zoom-in-btn">放大</button>
+                        <button class="map-control-btn" id="zoom-out-btn">缩小</button>
+                    </div>
+                </div>
+                <div class="map-info-panel">
+                    <h3>地图信息</h3>
+                    <div class="map-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">附近充电站</span>
+                            <span class="stat-value" id="nearby-count">5</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">可用充电桩</span>
+                            <span class="stat-value" id="available-count">12</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 充电页面 -->
+        <section id="charging-page" class="page">
+            <div class="page-content">
+                <div class="charging-status" id="charging-status">
+                    <div class="status-icon">⚡</div>
+                    <h2>充电状态</h2>
+                    <div class="status-info">
+                        <div class="status-item">
+                            <span class="status-label">状态</span>
+                            <span class="status-value" id="charging-state">未充电</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">进度</span>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="charging-progress" style="width: 0%"></div>
+                            </div>
+                            <span class="progress-text" id="charging-progress-text">0%</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">已充电量</span>
+                            <span class="status-value" id="charged-energy">0 kWh</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">预计剩余时间</span>
+                            <span class="status-value" id="remaining-time">--</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">当前费用</span>
+                            <span class="status-value" id="current-cost">¥0.00</span>
+                        </div>
+                    </div>
+                    <div class="charging-actions">
+                        <button class="primary-btn" id="start-charging-btn">开始充电</button>
+                        <button class="secondary-btn" id="stop-charging-btn" disabled>停止充电</button>
+                    </div>
+                </div>
+
+                <div class="charging-history">
+                    <h3>充电历史</h3>
+                    <div class="history-list" id="charging-history-list">
+                        <!-- 充电历史记录将在这里动态加载 -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 推荐页面 -->
+        <section id="recommendation-page" class="page">
+            <div class="page-content">
+                <h2>智能推荐</h2>
+                
+                <div class="user-preferences">
+                    <h3>偏好设置</h3>
+                    <div class="preference-options">
+                        <label class="preference-option">
+                            <input type="checkbox" id="pref-fast-charging" checked>
+                            <span>优先推荐快速充电</span>
+                        </label>
+                        <label class="preference-option">
+                            <input type="checkbox" id="pref-high-availability" checked>
+                            <span>优先推荐可用桩多</span>
+                        </label>
+                        <div class="preference-option">
+                            <label for="pref-max-distance">最大距离：</label>
+                            <select id="pref-max-distance">
+                                <option value="500">500米</option>
+                                <option value="1000">1公里</option>
+                                <option value="2000" selected>2公里</option>
+                                <option value="5000">5公里</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="secondary-btn" id="save-preferences-btn">保存偏好</button>
+                </div>
+                
+                <div class="recommendation-results">
+                    <h3>为您推荐</h3>
+                    <div id="recommended-stations" class="station-list">
+                        <!-- 推荐充电站将在这里动态加载 -->
+                    </div>
+                </div>
+                
+                <div class="popular-stations">
+                    <h3>热门充电站</h3>
+                    <div id="popular-stations" class="station-list">
+                        <!-- 热门充电站将在这里动态加载 -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 社区页面 -->
+        <section id="community-page" class="page">
+            <div class="page-content">
+                <h2>社区评价</h2>
+                
+                <div class="station-selector">
+                    <h3>选择充电站</h3>
+                    <select id="review-station-select">
+                        <option value="">请选择充电站</option>
+                    </select>
+                </div>
+                
+                <div class="station-reviews" id="station-reviews-container">
+                    <h3>充电站评价</h3>
+                    <div id="reviews-list" class="reviews-list">
+                        <!-- 评价列表将在这里动态加载 -->
+                    </div>
+                </div>
+                
+                <div class="submit-review">
+                    <h3>发表评价</h3>
+                    <div class="review-form">
+                        <div class="rating-selector">
+                            <label>评分：</label>
+                            <div class="star-rating" id="star-rating">
+                                <span class="star" data-rating="1">⭐</span>
+                                <span class="star" data-rating="2">⭐</span>
+                                <span class="star" data-rating="3">⭐</span>
+                                <span class="star" data-rating="4">⭐</span>
+                                <span class="star" data-rating="5">⭐</span>
+                            </div>
+                        </div>
+                        <div class="comment-input">
+                            <label for="review-comment">评价：</label>
+                            <textarea id="review-comment" rows="3" placeholder="分享您的充电体验..."></textarea>
+                        </div>
+                        <button class="primary-btn" id="submit-review-btn">提交评价</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 个人中心页面 -->
+        <section id="profile-page" class="page">
+            <div class="page-content">
+                <div class="user-profile">
+                    <div class="user-avatar">
+                        <img src="https://via.placeholder.com/100x100/4CAF50/FFFFFF?text=用户" alt="用户头像">
+                    </div>
+                    <h2>张三</h2>
+                    <p class="user-level">黄金会员</p>
+                </div>
+
+                <div class="user-stats">
+                    <div class="stat-item">
+                        <span class="stat-value">42</span>
+                        <span class="stat-label">充电次数</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value">1250.5</span>
+                        <span class="stat-label">充电量(kWh)</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value">¥1850.75</span>
+                        <span class="stat-label">总费用</span>
+                    </div>
+                </div>
+
+                <div class="menu-list">
+                    <button class="menu-item" id="charging-history-menu">
+                        <span class="menu-icon">📊</span>
+                        <span class="menu-text">充电历史</span>
+                        <span class="menu-arrow">›</span>
+                    </button>
+                    <button class="menu-item" id="reservation-menu">
+                        <span class="menu-icon">📅</span>
+                        <span class="menu-text">我的预约</span>
+                        <span class="menu-arrow">›</span>
+                    </button>
+                    <button class="menu-item" id="payment-menu">
+                        <span class="menu-icon">💳</span>
+                        <span class="menu-text">支付方式</span>
+                        <span class="menu-arrow">›</span>
+                    </button>
+                    <button class="menu-item" id="settings-menu">
+                        <span class="menu-icon">⚙️</span>
+                        <span class="menu-text">设置</span>
+                        <span class="menu-arrow">›</span>
+                    </button>
+                    <button class="menu-item" id="help-menu">
+                        <span class="menu-icon">❓</span>
+                        <span class="menu-text">帮助与反馈</span>
+                        <span class="menu-arrow">›</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 底部导航 -->
+    <nav class="bottom-nav">
+        <button class="nav-item active" data-page="home-page">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-text">首页</span>
+        </button>
+        <button class="nav-item" data-page="map-page">
+            <span class="nav-icon">🗺️</span>
+            <span class="nav-text">地图</span>
+        </button>
+        <button class="nav-item" data-page="charging-page">
+            <span class="nav-icon">⚡</span>
+            <span class="nav-text">充电</span>
+        </button>
+        <button class="nav-item" data-page="recommendation-page">
+            <span class="nav-icon">🌟</span>
+            <span class="nav-text">推荐</span>
+        </button>
+        <button class="nav-item" data-page="profile-page">
+            <span class="nav-icon">👤</span>
+            <span class="nav-text">我的</span>
+        </button>
+    </nav>
+
+    <!-- 预约弹窗 -->
+    <div class="modal" id="reservation-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>预约充电站</h3>
+                <button class="close-btn" id="close-reservation-modal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="reservation-date">预约日期</label>
+                    <input type="date" id="reservation-date">
+                </div>
+                <div class="form-group">
+                    <label for="reservation-time">预约时间</label>
+                    <input type="time" id="reservation-time">
+                </div>
+                <div class="form-group">
+                    <label for="reservation-duration">预计充电时长(分钟)</label>
+                    <input type="number" id="reservation-duration" min="30" max="240" value="60">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="secondary-btn" id="cancel-reservation">取消</button>
+                <button class="primary-btn" id="confirm-reservation">确认预约</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 充电站详情弹窗 -->
+    <div class="modal" id="station-detail-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>充电站详情</h3>
+                <button class="close-btn" id="close-station-detail-modal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="station-detail-info">
+                    <!-- 充电站详情将在这里动态加载 -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="secondary-btn" id="close-station-detail">关闭</button>
+                <button class="primary-btn" id="reserve-station-btn">预约</button>
+                <button class="primary-btn" id="start-charging-modal-btn">开始充电</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript文件 -->
+    <script src="mock-api.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

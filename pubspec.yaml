@@ -1,0 +1,14 @@
+name: mobile_charging_app
+description: Mobile Wireless Charging App
+version: 1.0.0
+
+environment:
+  sdk: ">=2.17.0 <3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^0.13.5
+
+flutter:
+  uses-material-design: true
