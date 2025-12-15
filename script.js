@@ -5276,22 +5276,23 @@ const cacheHitCountEl = document.getElementById('cache-hit-count');
 const errorCountEl = document.getElementById('error-count');
 
 // 性能面板切换
-performanceToggle.addEventListener('click', () => {
-    performancePanel.classList.toggle('visible');
-    
-    // 如果是打开面板，添加打开性能监控页面的按钮
-    if (performancePanel.classList.contains('visible')) {
-        // 检查是否已经添加了按钮
-        if (!performancePanel.querySelector('#open-performance-monitor')) {
-            const openMonitorBtn = document.createElement('button');
-            openMonitorBtn.id = 'open-performance-monitor';
-            openMonitorBtn.className = 'btn';
-            openMonitorBtn.textContent = '打开性能监控面板';
-            openMonitorBtn.style.marginTop = '10px';
-            openMonitorBtn.style.width = '100%';
-            
-            openMonitorBtn.addEventListener('click', () => {
-                // 打开性能监控页面
+if (performanceToggle) {
+    performanceToggle.addEventListener('click', () => {
+        performancePanel.classList.toggle('visible');
+        
+        // 如果是打开面板，添加打开性能监控页面的按钮
+        if (performancePanel.classList.contains('visible')) {
+            // 检查是否已经添加了按钮
+            if (!performancePanel.querySelector('#open-performance-monitor')) {
+                const openMonitorBtn = document.createElement('button');
+                openMonitorBtn.id = 'open-performance-monitor';
+                openMonitorBtn.className = 'btn';
+                openMonitorBtn.textContent = '打开性能监控面板';
+                openMonitorBtn.style.marginTop = '10px';
+                openMonitorBtn.style.width = '100%';
+                
+                openMonitorBtn.addEventListener('click', () => {
+                    // 打开性能监控页面
                 window.open('performance_monitor.html', '_blank');
             });
             
@@ -5301,7 +5302,8 @@ performanceToggle.addEventListener('click', () => {
     
     // 更新性能数据
     updatePerformancePanel();
-});
+    });
+}
 
 // 更新性能面板数据
 function updatePerformancePanel() {
