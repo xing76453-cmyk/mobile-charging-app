@@ -1,6 +1,47 @@
 // 全局变量
 let chargingStations = [];
 
+// 添加调试代码
+window.addEventListener('error', function(e) {
+    console.error('全局错误:', e.error);
+});
+
+window.addEventListener('unhandledrejection', function(e) {
+    console.error('未处理的Promise拒绝:', e.reason);
+});
+
+// 检查关键依赖
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM加载完成');
+    
+    // 检查ApiService是否可用
+    if (typeof ApiService === 'undefined') {
+        console.error('ApiService未定义，应用可能无法正常工作');
+    } else {
+        console.log('ApiService已定义');
+    }
+    
+    // 检查关键元素是否存在
+    const criticalElements = [
+        'home-page',
+        'map-page',
+        'reservation-page',
+        'payment-page',
+        'recommendation-page',
+        'community-page',
+        'profile-page'
+    ];
+    
+    criticalElements.forEach(id => {
+        const element = document.getElementById(id);
+        if (!element) {
+            console.error(`关键元素缺失: ${id}`);
+        } else {
+            console.log(`关键元素存在: ${id}`);
+        }
+    });
+});
+
 // 全局性能优化器实例
 let globalOptimizer = null;
 

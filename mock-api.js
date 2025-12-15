@@ -380,6 +380,14 @@ class MockApiService {
                         helpful: 6
                     }
                 ];
+                resolve(reviews);
+            }, 300);
+        });
+    }
+}
+
+// 替换原有的ApiService
+window.ApiService = MockApiService;
                 
                 resolve(reviews);
             }, 400);
