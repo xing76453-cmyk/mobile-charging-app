@@ -25,8 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const criticalElements = [
         'home-page',
         'map-page',
-        'reservation-page',
-        'payment-page',
+        'charging-page',
         'recommendation-page',
         'community-page',
         'profile-page'
@@ -5566,6 +5565,13 @@ function initOnboardingGuide() {
     const guideOverlay = document.getElementById('guide-overlay');
     const guideSkip = document.getElementById('guide-skip');
     const guideSteps = document.querySelectorAll('.guide-step');
+    
+    // 检查元素是否存在
+    if (!guideOverlay || !guideSkip || guideSteps.length === 0) {
+        console.log('新手引导元素不存在，跳过引导功能');
+        return;
+    }
+    
     let currentStep = 0;
     
     // 检查是否是首次访问
