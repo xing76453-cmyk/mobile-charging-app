@@ -85,28 +85,129 @@
         <!-- 地图页面 -->
         <section id="map-page" class="page">
             <div class="page-content">
-                <div class="map-container">
-                    <div class="map-placeholder" id="map-placeholder">
-                        <div class="map-icon">🗺️</div>
-                        <p>地图加载中...</p>
-                        <p class="map-note">在实际应用中，这里会显示交互式地图</p>
-                    </div>
-                    <div class="map-controls">
-                        <button class="map-control-btn" id="locate-btn">定位</button>
-                        <button class="map-control-btn" id="zoom-in-btn">放大</button>
-                        <button class="map-control-btn" id="zoom-out-btn">缩小</button>
-                    </div>
-                </div>
-                <div class="map-info-panel">
-                    <h3>地图信息</h3>
-                    <div class="map-stats">
-                        <div class="stat-item">
-                            <span class="stat-label">附近充电站</span>
-                            <span class="stat-value" id="nearby-count">5</span>
+                <div class="control-dashboard">
+                    <div class="control-header">
+                        <div>
+                            <h2>停车场无线充电机器人 · 系统级控制</h2>
+                            <p class="control-subtitle">定位 · 对接 · 供能 · 调度 完整闭环展示</p>
                         </div>
-                        <div class="stat-item">
-                            <span class="stat-label">可用充电桩</span>
-                            <span class="stat-value" id="available-count">12</span>
+                        <div class="mode-switch">
+                            <label>
+                                <span>模式</span>
+                                <select id="system-mode">
+                                    <option value="simulation">仿真模式</option>
+                                    <option value="hardware">实物接口预留</option>
+                                </select>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="overview-grid">
+                        <div class="overview-card">
+                            <p class="label">系统状态机</p>
+                            <p class="value" id="system-state">空闲</p>
+                            <p class="hint">空闲 / 执行任务 / 接电 / 充电 / 撤离 / 异常</p>
+                        </div>
+                        <div class="overview-card">
+                            <p class="label">活跃任务</p>
+                            <p class="value" id="active-task-count">0</p>
+                            <p class="hint">待分配 → 执行中 → 已完成 / 异常</p>
+                        </div>
+                        <div class="overview-card">
+                            <p class="label">接电节点</p>
+                            <p class="value" id="connected-nodes">0/3</p>
+                            <p class="hint">线缆长度 / 张力安全</p>
+                        </div>
+                        <div class="overview-card">
+                            <p class="label">冲突化解</p>
+                            <p class="value" id="conflict-count">0</p>
+                            <p class="hint">等待 / 改道 / 重分配</p>
+                        </div>
+                    </div>
+
+                    <div class="control-grid">
+                        <div class="map-panel">
+                            <div class="map-toolbar">
+                                <div>
+                                    <h3>停车场电子地图</h3>
+                                    <p class="map-caption">实时显示机器人、供能节点、目标车位与路径规划</p>
+                                </div>
+                                <div class="map-legend">
+                                    <span class="legend-item legend-idle">空闲</span>
+                                    <span class="legend-item legend-task">执行</span>
+                                    <span class="legend-item legend-docking">接电/对接</span>
+                                    <span class="legend-item legend-charging">充电</span>
+                                    <span class="legend-item legend-alert">张力预警</span>
+                                </div>
+                            </div>
+                            <canvas id="control-map" width="820" height="420"></canvas>
+                            <div class="map-controls">
+                                <button class="map-control-btn" id="locate-btn">定位</button>
+                                <button class="map-control-btn" id="zoom-in-btn">放大</button>
+                                <button class="map-control-btn" id="zoom-out-btn">缩小</button>
+                            </div>
+                        </div>
+
+                        <div class="side-panels">
+                            <div class="panel">
+                                <div class="panel-header">
+                                    <h4>充电任务管理</h4>
+                                    <span class="pill">入口</span>
+                                </div>
+                                <div class="form-grid">
+                                    <label>车辆位置/车位<input type="text" id="task-location" placeholder="例：A区B1-018"></label>
+                                    <label>车型/模拟车型<input type="text" id="task-vehicle" placeholder="SUV / 轿车 / MPV"></label>
+                                    <label>充电需求(kWh)<input type="number" id="task-demand" min="10" max="120" value="40"></label>
+                                    <label>优先级
+                                        <select id="task-priority">
+                                            <option value="high">高</option>
+                                            <option value="medium" selected>中</option>
+                                            <option value="low">低</option>
+                                        </select>
+                                    </label>
+                                </div>
+                                <button class="primary-btn full" id="create-task-btn">新建充电任务</button>
+                                <div class="task-queue" id="task-queue"></div>
+                            </div>
+
+                            <div class="panel">
+                                <div class="panel-header">
+                                    <h4>机器人管理与状态监控</h4>
+                                    <span class="pill success">实时</span>
+                                </div>
+                                <div class="robot-list" id="robot-monitor-list"></div>
+                            </div>
+
+                            <div class="panel">
+                                <div class="panel-header">
+                                    <h4>对接与无线充电流程</h4>
+                                    <span class="pill info">流程</span>
+                                </div>
+                                <div class="docking-flow" id="docking-stage-list"></div>
+                                <div class="progress-wrap">
+                                    <div class="progress-bar thin">
+                                        <div class="progress-fill" id="docking-progress" style="width: 0%"></div>
+                                    </div>
+                                    <span class="progress-text" id="docking-progress-text">粗定位</span>
+                                </div>
+                            </div>
+
+                            <div class="panel">
+                                <div class="panel-header">
+                                    <h4>接电 / 线缆约束</h4>
+                                    <span class="pill warning">约束</span>
+                                </div>
+                                <div class="cable-list" id="cable-status-list"></div>
+                            </div>
+
+                            <div class="panel">
+                                <div class="panel-header">
+                                    <h4>多机器人调度与冲突</h4>
+                                    <span class="pill">调度</span>
+                                </div>
+                                <div class="dispatch-log" id="dispatch-log"></div>
+                                <div class="conflict-list" id="conflict-list"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
