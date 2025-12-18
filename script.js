@@ -1228,6 +1228,526 @@ class ApiService {
     }
 }
 
+// ====================== 系统级控制与调度数据模型 ======================
+const controlModel = {
+    mode: 'simulation',
+    state: '空闲',
+    zoom: 1,
+    center: { x: 410, y: 210 },
+    nodes: [
+        { id: 'N1', name: '供能节点 A', x: 140, y: 120, cableLimit: 240, status: '在线' },
+        { id: 'N2', name: '供能节点 B', x: 420, y: 80, cableLimit: 220, status: '在线' },
+        { id: 'N3', name: '供能节点 C', x: 320, y: 300, cableLimit: 260, status: '在线' }
+    ],
+    robots: [
+        { id: 'R1', name: '机器人 #01', status: '空闲', battery: 82, x: 180, y: 160, connectedNode: 'N1', cableLimit: 240, mode: '自动' },
+        { id: 'R2', name: '机器人 #02', status: '执行任务', battery: 67, x: 360, y: 180, connectedNode: 'N2', cableLimit: 220, mode: '自动' },
+        { id: 'R3', name: '机器人 #03', status: '充电中', battery: 48, x: 330, y: 260, connectedNode: 'N3', cableLimit: 260, mode: '自动' }
+    ],
+    tasks: [
+        { id: 'T-101', location: 'A区 B1-018', vehicle: 'SUV', demand: 45, priority: 'high', target: { x: 520, y: 190 }, status: '待分配', createdAt: Date.now() - 1000 * 60 * 2 },
+        { id: 'T-102', location: 'B区 B2-006', vehicle: '轿车', demand: 28, priority: 'medium', target: { x: 260, y: 260 }, status: '执行中', assignedRobot: 'R2', createdAt: Date.now() - 1000 * 60 * 5 },
+        { id: 'T-103', location: 'C区 B3-021', vehicle: 'MPV', demand: 60, priority: 'low', target: { x: 440, y: 340 }, status: '已完成', createdAt: Date.now() - 1000 * 60 * 15 }
+    ],
+    docking: {
+        stages: [
+            '到达车位', '进入车底', '车型识别',
+            '粗定位', '精定位', '毫米级对准',
+            '无线充电启动', '充电中'
+        ],
+        currentStage: 0,
+        progress: 0,
+        activeRobot: null
+    },
+    conflicts: [],
+    dispatchLog: []
+};
+
+// 创建充电任务
+function createNewTask(task) {
+    controlModel.tasks.unshift({
+        ...task,
+        id: `T-${Math.floor(Math.random() * 900 + 100)}`,
+        status: '待分配',
+        createdAt: Date.now()
+    });
+    updateTaskQueueUI();
+    scheduleTasks();
+}
+
+// 任务队列 UI
+function updateTaskQueueUI() {
+    const container = document.getElementById('task-queue');
+    const activeTaskCount = document.getElementById('active-task-count');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    controlModel.tasks.forEach(task => {
+        const card = document.createElement('div');
+        card.className = 'task-card';
+        card.innerHTML = `
+            <div class="task-title">${task.location} · ${task.vehicle}</div>
+            <div class="task-meta">
+                <span>需求: ${task.demand} kWh</span>
+                <span>优先级: ${task.priority}</span>
+                <span>状态: ${task.status}</span>
+                ${task.assignedRobot ? `<span>机器人: ${task.assignedRobot}</span>` : ''}
+            </div>
+        `;
+        container.appendChild(card);
+    });
+    
+    if (activeTaskCount) {
+        const active = controlModel.tasks.filter(t => t.status !== '已完成' && t.status !== '异常').length;
+        activeTaskCount.textContent = active;
+    }
+}
+
+// 机器人 UI
+function updateRobotMonitor() {
+    const list = document.getElementById('robot-monitor-list');
+    if (!list) return;
+    list.innerHTML = '';
+    controlModel.robots.forEach(robot => {
+        const statusClass = getRobotStatusClass(robot.status);
+        const card = document.createElement('div');
+        card.className = 'robot-card';
+        card.innerHTML = `
+            <div>
+                <div class="task-title">${robot.name}</div>
+                <div class="robot-meta">
+                    <span>状态: <span class="status-pill ${statusClass}">${robot.status}</span></span>
+                    <span>电量: ${robot.battery}%</span>
+                    <span>位置: (${Math.round(robot.x)}, ${Math.round(robot.y)})</span>
+                    <span>接电: ${robot.connectedNode || '未接'}</span>
+                </div>
+            </div>
+            <div class="robot-meta">
+                <span>模式: ${robot.mode}</span>
+                <span>${robot.currentTask ? `任务: ${robot.currentTask}` : '待命'}</span>
+            </div>
+        `;
+        list.appendChild(card);
+    });
+}
+
+function getRobotStatusClass(status) {
+    if (status.includes('执行') || status === '服务中') return 'status-task';
+    if (status.includes('接电') || status.includes('对接')) return 'status-docking';
+    if (status.includes('充电')) return 'status-charging';
+    if (status.includes('异常')) return 'status-alert';
+    return 'status-idle';
+}
+
+// 对接流程 UI
+function updateDockingFlow() {
+    const list = document.getElementById('docking-stage-list');
+    const progress = document.getElementById('docking-progress');
+    const progressText = document.getElementById('docking-progress-text');
+    if (!list) return;
+    list.innerHTML = '';
+    controlModel.docking.stages.forEach((stage, index) => {
+        const row = document.createElement('div');
+        row.className = 'docking-step';
+        if (index === controlModel.docking.currentStage) row.classList.add('active');
+        row.innerHTML = `<span>${stage}</span><span>${index === controlModel.docking.currentStage ? '进行中' : ''}</span>`;
+        list.appendChild(row);
+    });
+    if (progress) progress.style.width = `${controlModel.docking.progress}%`;
+    if (progressText) progressText.textContent = controlModel.docking.stages[controlModel.docking.currentStage] || '已完成';
+}
+
+// 线缆与供能节点 UI
+function updateCableStatusUI() {
+    const list = document.getElementById('cable-status-list');
+    const nodeCount = document.getElementById('connected-nodes');
+    if (!list) return;
+    list.innerHTML = '';
+    controlModel.nodes.forEach(node => {
+        const connected = controlModel.robots.filter(r => r.connectedNode === node.id);
+        const card = document.createElement('div');
+        card.className = 'cable-card';
+        card.innerHTML = `
+            <div class="task-title">${node.name}</div>
+            <div class="task-meta">
+                <span>状态: ${node.status}</span>
+                <span>最大线缆: ${node.cableLimit}cm</span>
+                <span>接入机器人: ${connected.length}</span>
+            </div>
+        `;
+        list.appendChild(card);
+    });
+    if (nodeCount) {
+        const activeNodes = controlModel.nodes.filter(node => controlModel.robots.some(r => r.connectedNode === node.id)).length;
+        nodeCount.textContent = `${activeNodes}/${controlModel.nodes.length}`;
+    }
+}
+
+// 调度日志与冲突
+function updateDispatchUI() {
+    const log = document.getElementById('dispatch-log');
+    const conflictList = document.getElementById('conflict-list');
+    const conflictCount = document.getElementById('conflict-count');
+    if (log) {
+        log.innerHTML = '';
+        controlModel.dispatchLog.slice(-6).reverse().forEach(item => {
+            const row = document.createElement('div');
+            row.className = 'dispatch-item';
+            row.innerHTML = `<strong>${item.title}</strong><div class="task-meta"><span>${item.detail}</span><span>${item.time}</span></div>`;
+            log.appendChild(row);
+        });
+    }
+    if (conflictList) {
+        conflictList.innerHTML = '';
+        controlModel.conflicts.forEach(conflict => {
+            const row = document.createElement('div');
+            row.className = 'conflict-item alert';
+            row.innerHTML = `<strong>${conflict.robots.join(' vs ')}</strong><div class="task-meta"><span>${conflict.type}</span><span>${conflict.resolution}</span></div>`;
+            conflictList.appendChild(row);
+        });
+    }
+    if (conflictCount) conflictCount.textContent = controlModel.conflicts.length;
+}
+
+// 概览状态
+function updateOverviewState() {
+    const state = document.getElementById('system-state');
+    const hasError = controlModel.robots.some(r => r.status.includes('异常'));
+    const docking = !!controlModel.docking.activeRobot;
+    const charging = controlModel.robots.some(r => r.status.includes('充电'));
+    const working = controlModel.robots.some(r => r.status.includes('执行'));
+    
+    if (hasError) controlModel.state = '异常';
+    else if (docking) controlModel.state = '接电/对接';
+    else if (charging) controlModel.state = '充电';
+    else if (working) controlModel.state = '执行任务';
+    else controlModel.state = '空闲';
+    
+    if (state) state.textContent = controlModel.state;
+}
+
+// 调度策略：最近可用机器人 + 优先级
+function scheduleTasks() {
+    const waitingTasks = controlModel.tasks.filter(t => t.status === '待分配');
+    waitingTasks.sort((a, b) => priorityWeight(b.priority) - priorityWeight(a.priority));
+    
+    waitingTasks.forEach(task => {
+        const idleRobot = controlModel.robots
+            .filter(r => r.status === '空闲' || r.status === '返回中')
+            .sort((a, b) => distance(a, task.target) - distance(b, task.target))[0];
+        if (idleRobot) {
+            assignTask(idleRobot, task);
+        }
+    });
+    updateDispatchUI();
+}
+
+function priorityWeight(priority) {
+    if (priority === 'high') return 3;
+    if (priority === 'medium') return 2;
+    return 1;
+}
+
+function assignTask(robot, task) {
+    task.status = '执行中';
+    task.assignedRobot = robot.id;
+    robot.currentTask = task.id;
+    robot.status = '执行任务';
+    robot.path = buildPath(robot, task.target);
+    addDispatchLog(`分配 ${task.id}`, `${robot.name} → ${task.location}`);
+}
+
+function addDispatchLog(title, detail) {
+    controlModel.dispatchLog.push({
+        title,
+        detail,
+        time: new Date().toLocaleTimeString('zh-CN', { hour12: false })
+    });
+}
+
+// 路径规划（简化直线 + 约束投影）
+function buildPath(robot, target) {
+    if (!robot.connectedNode) return [ { x: robot.x, y: robot.y }, target ];
+    const node = controlModel.nodes.find(n => n.id === robot.connectedNode);
+    const distToTarget = distance(node, target);
+    if (distToTarget > robot.cableLimit) {
+        // 投影到可达域边界
+        const ratio = (robot.cableLimit - 10) / distToTarget;
+        const constrained = {
+            x: node.x + (target.x - node.x) * ratio,
+            y: node.y + (target.y - node.y) * ratio
+        };
+        return [ { x: robot.x, y: robot.y }, constrained ];
+    }
+    return [ { x: robot.x, y: robot.y }, target ];
+}
+
+// 地图绘制
+function renderControlMap() {
+    const canvas = document.getElementById('control-map');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const { width, height } = canvas;
+    ctx.clearRect(0, 0, width, height);
+    
+    // 背景网格
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    for (let x = 0; x < width; x += 40 * controlModel.zoom) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+    }
+    for (let y = 0; y < height; y += 40 * controlModel.zoom) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+    }
+    ctx.restore();
+    
+    // 车位块
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    for (let i = 0; i < 6; i++) {
+        ctx.strokeRect(80 + i * 100, 110, 60, 120);
+    }
+    ctx.restore();
+    
+    // 供能节点及可达域
+    controlModel.nodes.forEach(node => {
+        ctx.save();
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(59,130,246,0.25)';
+        ctx.lineWidth = 1.5;
+        ctx.arc(node.x, node.y, node.cableLimit, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = '#1d4ed8';
+        ctx.fillRect(node.x - 6, node.y - 6, 12, 12);
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillText(node.name, node.x + 10, node.y - 10);
+        ctx.restore();
+    });
+    
+    // 任务目标
+    controlModel.tasks.forEach(task => {
+        if (task.status === '已完成') return;
+        ctx.save();
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath();
+        ctx.arc(task.target.x, task.target.y, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#e5e7eb';
+        ctx.fillText(task.id, task.target.x + 10, task.target.y);
+        ctx.restore();
+    });
+    
+    // 机器人与路径
+    controlModel.robots.forEach(robot => {
+        const node = controlModel.nodes.find(n => n.id === robot.connectedNode);
+        if (node) {
+            const cableDist = distance(robot, node);
+            const tensionRatio = cableDist / (robot.cableLimit || node.cableLimit);
+            ctx.save();
+            ctx.strokeStyle = tensionRatio > 1 ? '#ef4444' : tensionRatio > 0.7 ? '#f59e0b' : '#10b981';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(node.x, node.y);
+            ctx.lineTo(robot.x, robot.y);
+            ctx.stroke();
+            ctx.restore();
+        }
+        
+        if (robot.path) {
+            ctx.save();
+            ctx.strokeStyle = '#6366f1';
+            ctx.setLineDash([6, 4]);
+            ctx.beginPath();
+            ctx.moveTo(robot.x, robot.y);
+            robot.path.forEach(p => {
+                ctx.lineTo(p.x, p.y);
+            });
+            ctx.stroke();
+            ctx.restore();
+        }
+        
+        ctx.save();
+        ctx.fillStyle = robotColor(robot.status);
+        ctx.beginPath();
+        ctx.arc(robot.x, robot.y, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#e2e8f0';
+        ctx.fillText(robot.id, robot.x - 10, robot.y - 14);
+        ctx.restore();
+    });
+}
+
+function robotColor(status) {
+    if (status.includes('执行')) return '#6366f1';
+    if (status.includes('接电') || status.includes('对接')) return '#f59e0b';
+    if (status.includes('充电')) return '#10b981';
+    if (status.includes('异常')) return '#ef4444';
+    return '#9ca3af';
+}
+
+function distance(a, b) {
+    return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+// 仿真 tick
+function simulationTick() {
+    controlModel.robots.forEach(robot => {
+        if (!robot.currentTask) return;
+        const task = controlModel.tasks.find(t => t.id === robot.currentTask);
+        if (!task || task.status === '已完成') return;
+        const target = robot.path ? robot.path[robot.path.length - 1] : task.target;
+        const dx = target.x - robot.x;
+        const dy = target.y - robot.y;
+        const step = 12;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 2) {
+            robot.x += (dx / dist) * step;
+            robot.y += (dy / dist) * step;
+            robot.status = '执行任务';
+        } else if (controlModel.docking.activeRobot !== robot.id) {
+            startDocking(robot, task);
+        }
+    });
+    
+    advanceDocking();
+    detectConflicts();
+    renderControlMap();
+    updateRobotMonitor();
+    updateCableStatusUI();
+    updateOverviewState();
+    updateDispatchUI();
+}
+
+function startDocking(robot, task) {
+    controlModel.docking.activeRobot = robot.id;
+    controlModel.docking.currentStage = 0;
+    controlModel.docking.progress = 0;
+    robot.status = '接电/对接';
+    addDispatchLog(`对接 ${task.id}`, `${robot.name} 进入精对准流程`);
+}
+
+function advanceDocking() {
+    if (!controlModel.docking.activeRobot) return;
+    controlModel.docking.progress += 18;
+    if (controlModel.docking.progress >= 100) {
+        controlModel.docking.progress = 0;
+        controlModel.docking.currentStage += 1;
+    }
+    if (controlModel.docking.currentStage >= controlModel.docking.stages.length) {
+        const robot = controlModel.robots.find(r => r.id === controlModel.docking.activeRobot);
+        const task = controlModel.tasks.find(t => t.id === robot.currentTask);
+        if (robot && task) {
+            robot.status = '充电中';
+            task.status = '已完成';
+            addDispatchLog(`任务完成 ${task.id}`, `${robot.name} 已启动无线充电`);
+            robot.currentTask = null;
+            robot.path = [];
+        }
+        controlModel.docking.activeRobot = null;
+        controlModel.docking.currentStage = 0;
+    }
+    updateDockingFlow();
+}
+
+function detectConflicts() {
+    controlModel.conflicts = [];
+    for (let i = 0; i < controlModel.robots.length; i++) {
+        for (let j = i + 1; j < controlModel.robots.length; j++) {
+            const a = controlModel.robots[i];
+            const b = controlModel.robots[j];
+            if (distance(a, b) < 40) {
+                controlModel.conflicts.push({
+                    robots: [a.id, b.id],
+                    type: '时空冲突',
+                    resolution: '等待 + 改道'
+                });
+            }
+        }
+    }
+}
+
+// 事件初始化
+function initControlCenter() {
+    const modeSelect = document.getElementById('system-mode');
+    const createTaskBtn = document.getElementById('create-task-btn');
+    const zoomIn = document.getElementById('zoom-in-btn');
+    const zoomOut = document.getElementById('zoom-out-btn');
+    const locateBtn = document.getElementById('locate-btn');
+    
+    // 让已有任务与机器人对齐
+    controlModel.tasks.forEach(task => {
+        if (task.assignedRobot) {
+            const robot = controlModel.robots.find(r => r.id === task.assignedRobot);
+            if (robot) {
+                robot.currentTask = task.id;
+                robot.path = buildPath(robot, task.target);
+                robot.status = task.status === '已完成' ? '充电中' : '执行任务';
+            }
+        }
+    });
+    
+    if (modeSelect) {
+        modeSelect.addEventListener('change', () => {
+            controlModel.mode = modeSelect.value === 'hardware' ? '实物接口' : '仿真模式';
+            addDispatchLog('模式切换', `当前模式：${controlModel.mode}`);
+            updateOverviewState();
+            updateDispatchUI();
+        });
+    }
+    
+    if (zoomIn) {
+        zoomIn.addEventListener('click', () => {
+            controlModel.zoom = Math.min(1.6, controlModel.zoom + 0.1);
+            renderControlMap();
+        });
+    }
+    if (zoomOut) {
+        zoomOut.addEventListener('click', () => {
+            controlModel.zoom = Math.max(0.6, controlModel.zoom - 0.1);
+            renderControlMap();
+        });
+    }
+    if (locateBtn) {
+        locateBtn.addEventListener('click', () => {
+            addDispatchLog('定位', '回到停车场中心');
+            renderControlMap();
+            updateDispatchUI();
+        });
+    }
+    
+    if (createTaskBtn) {
+        createTaskBtn.addEventListener('click', () => {
+            const location = document.getElementById('task-location').value || '未命名车位';
+            const vehicle = document.getElementById('task-vehicle').value || '未知车型';
+            const demand = parseInt(document.getElementById('task-demand').value || '40', 10);
+            const priority = document.getElementById('task-priority').value;
+            const target = {
+                x: Math.random() * 680 + 80,
+                y: Math.random() * 260 + 80
+            };
+            createNewTask({ location, vehicle, demand, priority, target });
+        });
+    }
+    
+    // 初始 UI
+    updateTaskQueueUI();
+    updateRobotMonitor();
+    updateDockingFlow();
+    updateCableStatusUI();
+    updateDispatchUI();
+    updateOverviewState();
+    renderControlMap();
+    
+    // 周期刷新
+    setInterval(simulationTick, 1800);
+}
+
 // 初始化地图搜索和筛选功能
 function initMapSearchAndFilter() {
     // 高级搜索选项切换
@@ -6382,6 +6902,9 @@ const app = {
         if (typeof initAchievementSystem === 'function') {
             initAchievementSystem();
         }
+        
+        // 初始化系统级控制与调度平台
+        initControlCenter();
         
         // 定期更新性能面板（如果可见）
         const performancePanel = document.getElementById('performance-panel');
