@@ -1,6 +1,205 @@
 // 全局变量
 let chargingStations = [];
 
+// 地下车库默认参数配置
+const garagePresetConfig = {
+    layout: {
+        type: "单层地下车库",
+        size: "180m × 120m",
+        zones: [
+            { name: "A", range: "0–90, 0–60" },
+            { name: "B", range: "90–180, 0–60" },
+            { name: "C", range: "0–90, 60–120" },
+            { name: "D", range: "90–180, 60–120" }
+        ],
+        mainAisle: "7m",
+        branchAisle: "5m",
+        narrow: "3.2–3.6m",
+        basePoints: [
+            { zone: "A", point: "(5, 5)" },
+            { zone: "B", point: "(95, 5)" },
+            { zone: "C", point: "(5, 65)" },
+            { zone: "D", point: "(95, 65)" }
+        ],
+        spacing: { x: "5.8m", y: "8.5m" }
+    },
+    resources: {
+        robots: 4,
+        nodes: 4,
+        rule: "同一时刻一个节点仅允许一台机器人接入",
+        nodeArea: "节点周边4m×6m安全区，隔离桩+配电箱+指示灯"
+    },
+    nodes: [
+        { name: "N1", coord: "(30, 55)", coverage: "A/C", reason: "靠近西侧竖向动线" },
+        { name: "N2", coord: "(75, 65)", coverage: "C/A", reason: "热点节点，易演示排队" },
+        { name: "N3", coord: "(105, 55)", coverage: "B/D", reason: "覆盖东南/东北" },
+        { name: "N4", coord: "(150, 65)", coverage: "D/B", reason: "东侧主通道中部，便于并发" }
+    ],
+    parking: {
+        total: 360,
+        perZone: 90,
+        layout: "每区6排×15列",
+        slot: "2.5m × 5m 90°车位",
+        spacing: "同排中心距2.7m，排间8.5m，靠主通道预留7m",
+        aisles: "主通道7m，支路5m，狭窄段3.2–3.6m"
+    },
+    cable: {
+        Lmax: "35m",
+        safe: "30m",
+        tension: "绿/黄/红张力阈值，黄区降速，必要时缓退",
+        visibility: "接电状态下显示线缆：远景简线/中景曲线/近景链条"
+    },
+    difficulties: [
+        "柱阵狭窄段：3.2–3.6m，会车冲突高发，可用于让行演示",
+        "弱光暗区：照度降低30–50%，地面反光增强，便于视觉退化演示",
+        "临时障碍段：锥桶/购物车/临停随机出现，触发局部避障"
+    ],
+    peak: {
+        tasks: "10个并发任务（T-101~T-110），15秒窗口分批涌入",
+        distribution: "区域权重：C区35%、D区35%、A区15%、B区15%",
+        attributes: [
+            "SOC 10–35%，SOC越低优先级越高（P1/P2/P3）",
+            "目标充电时长8–18分钟（仿真20–60秒）"
+        ],
+        constraints: [
+            "节点互斥：同一节点同一时间仅1台机器人接入，排队/等待可视化",
+            "线缆约束：接电后保持在Rsafe=30m可达域内，可短暂投影可达域",
+            "冲突处理：狭窄段按优先级/先到先行让行，另一方等待或绕行"
+        ],
+        strategy: [
+            "滚动调度：每5秒重新评估未完成任务",
+            "成本口径：行驶时间+节点等待+线缆风险+超时惩罚",
+            "改派触发：排队>2或预计等待>45秒时改派到次优节点"
+        ],
+        events: [
+            "节点满载改派：N2排队过长，改派到N4并更新ETA",
+            "狭窄通道冲突：R2与R3会车，触发等待/让行提示",
+            "张力逼近降速：线缆张力进入黄区自动降速/缓退"
+        ]
+    }
+};
+
+function populateList(listId, items) {
+    const listElement = document.getElementById(listId);
+    if (!listElement) return;
+    listElement.innerHTML = '';
+    items.forEach(text => {
+        const li = document.createElement('li');
+        li.textContent = text;
+        listElement.appendChild(li);
+    });
+}
+
+function renderGaragePresetSummary() {
+    const zoneRanges = garagePresetConfig.layout.zones.map(zone => `${zone.name}(${zone.range})`).join(' / ');
+    populateList('garage-layout-list', [
+        `${garagePresetConfig.layout.type}，尺寸${garagePresetConfig.layout.size}`,
+        `分区范围：${zoneRanges}`,
+        `通道：主通道${garagePresetConfig.layout.mainAisle}，支路${garagePresetConfig.layout.branchAisle}，狭窄段${garagePresetConfig.layout.narrow}`,
+        '坐标原点(0,0)在西南角，统一米制坐标'
+    ]);
+
+    const nodeSummary = garagePresetConfig.nodes.map(node => `${node.name}${node.coord}`).join(' / ');
+    populateList('garage-resource-list', [
+        `机器人：${garagePresetConfig.resources.robots}台（R1–R4）`,
+        `供能节点：${garagePresetConfig.resources.nodes}个，${garagePresetConfig.resources.rule}`,
+        `节点坐标：${nodeSummary}`,
+        garagePresetConfig.resources.nodeArea
+    ]);
+
+    populateList('garage-parking-list', [
+        `车位：${garagePresetConfig.parking.total}个（每区${garagePresetConfig.parking.perZone}个，${garagePresetConfig.parking.layout}）`,
+        `车位规格：${garagePresetConfig.parking.slot}`,
+        `间距：${garagePresetConfig.parking.spacing}`,
+        `线缆：Lmax ${garagePresetConfig.cable.Lmax} / Rsafe ${garagePresetConfig.cable.safe} / ${garagePresetConfig.cable.tension}`
+    ]);
+
+    populateList('garage-peak-list', [
+        garagePresetConfig.peak.tasks,
+        garagePresetConfig.peak.distribution,
+        garagePresetConfig.peak.attributes[0],
+        `必出事件：${garagePresetConfig.peak.events.join('；')}`
+    ]);
+}
+
+function renderGarageSpecModal() {
+    const zoneRanges = garagePresetConfig.layout.zones.map(zone => `${zone.name}(${zone.range})`).join(' / ');
+    populateList('garage-layout-details', [
+        `${garagePresetConfig.layout.type}，尺寸${garagePresetConfig.layout.size}，原点(0,0)在西南角`,
+        `分区：${zoneRanges}`,
+        `通道：主通道${garagePresetConfig.layout.mainAisle}，支路${garagePresetConfig.layout.branchAisle}，狭窄段${garagePresetConfig.layout.narrow}`
+    ]);
+
+    populateList('garage-generation-list', [
+        `${garagePresetConfig.parking.layout}，编号A001-D090（每区001-090）`,
+        `车位中心坐标：x = x0 + c * ${garagePresetConfig.layout.spacing.x}，y = y0 + r * ${garagePresetConfig.layout.spacing.y}`,
+        `基准点：${garagePresetConfig.layout.basePoints.map(item => `${item.zone}${item.point}`).join(' / ')}`,
+        `间距口径：${garagePresetConfig.parking.spacing}`
+    ]);
+
+    const nodeTableBody = document.getElementById('garage-node-table-body');
+    if (nodeTableBody) {
+        nodeTableBody.innerHTML = '';
+        garagePresetConfig.nodes.forEach(node => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${node.name}</td>
+                <td>${node.coord}</td>
+                <td>${node.coverage}</td>
+                <td>${node.reason}</td>
+            `;
+            nodeTableBody.appendChild(row);
+        });
+    }
+
+    populateList('garage-cable-list', [
+        `最大线缆长度 Lmax：${garagePresetConfig.cable.Lmax}`,
+        `安全工作半径 Rsafe：${garagePresetConfig.cable.safe}`,
+        garagePresetConfig.cable.tension,
+        garagePresetConfig.cable.visibility
+    ]);
+
+    populateList('garage-difficulties-list', garagePresetConfig.difficulties);
+
+    const peakParameters = [
+        garagePresetConfig.peak.tasks,
+        garagePresetConfig.peak.distribution,
+        ...garagePresetConfig.peak.attributes,
+        ...garagePresetConfig.peak.constraints,
+        ...garagePresetConfig.peak.strategy
+    ];
+    populateList('garage-peak-parameters', peakParameters);
+    populateList('garage-peak-events-list', garagePresetConfig.peak.events);
+}
+
+function initGaragePresetSection() {
+    renderGaragePresetSummary();
+    renderGarageSpecModal();
+
+    const modal = document.getElementById('garage-spec-modal');
+    const openBtn = document.getElementById('garage-spec-btn');
+    const closeBtn = document.getElementById('close-garage-spec-modal');
+
+    if (openBtn && modal) {
+        openBtn.addEventListener('click', () => {
+            renderGarageSpecModal();
+            modal.classList.remove('hidden');
+        });
+    }
+
+    if (closeBtn && modal) {
+        closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
+    }
+
+    if (modal) {
+        modal.addEventListener('click', (event) => {
+            if (event.target === modal) {
+                modal.classList.add('hidden');
+            }
+        });
+    }
+}
+
 // 添加调试代码
 window.addEventListener('error', function(e) {
     console.error('全局错误:', e.error);
@@ -1995,6 +2194,9 @@ function initOtherFeatures() {
     if (typeof initGuideOverlay === 'function') {
         initGuideOverlay();
     }
+
+    // 渲染地下车库默认参数
+    initGaragePresetSection();
     
     // 直接在控制台输出导航栏状态
     setTimeout(() => {
