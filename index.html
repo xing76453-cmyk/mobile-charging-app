@@ -73,6 +73,49 @@
                     </button>
                 </div>
 
+                <div class="garage-preset-section">
+                    <div class="section-header">
+                        <div>
+                            <p class="eyebrow">地下车库默认参数</p>
+                            <h2>集中供能 · 按需接入 · 闭环调度</h2>
+                            <p class="section-subtitle">单层四分区、节点互斥、线缆约束与高峰必出戏，一键展示工程化场景</p>
+                        </div>
+                        <div class="section-actions">
+                            <button class="secondary-btn" id="garage-spec-btn">查看完整规范</button>
+                        </div>
+                    </div>
+                    <div class="scenario-grid">
+                        <div class="scenario-card">
+                            <div class="scenario-card-title">
+                                <span class="scenario-label">场景尺度与分区</span>
+                                <span class="scenario-chip">180×120m</span>
+                            </div>
+                            <ul class="scenario-list" id="garage-layout-list"></ul>
+                        </div>
+                        <div class="scenario-card">
+                            <div class="scenario-card-title">
+                                <span class="scenario-label">机器人与供能节点</span>
+                                <span class="scenario-chip">4R / 4N</span>
+                            </div>
+                            <ul class="scenario-list" id="garage-resource-list"></ul>
+                        </div>
+                        <div class="scenario-card">
+                            <div class="scenario-card-title">
+                                <span class="scenario-label">车位与线缆约束</span>
+                                <span class="scenario-chip">360位</span>
+                            </div>
+                            <ul class="scenario-list" id="garage-parking-list"></ul>
+                        </div>
+                        <div class="scenario-card">
+                            <div class="scenario-card-title">
+                                <span class="scenario-label">高峰触发逻辑</span>
+                                <span class="scenario-chip">10并发</span>
+                            </div>
+                            <ul class="scenario-list" id="garage-peak-list"></ul>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="nearby-stations">
                     <h2>附近充电站</h2>
                     <div class="station-list" id="nearby-stations-list">
@@ -371,6 +414,121 @@
                 <button class="secondary-btn" id="close-station-detail">关闭</button>
                 <button class="primary-btn" id="reserve-station-btn">预约</button>
                 <button class="primary-btn" id="start-charging-modal-btn">开始充电</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 地下车库默认参数弹窗 -->
+    <div class="modal hidden" id="garage-spec-modal">
+        <div class="modal-content wide">
+            <div class="modal-header">
+                <h3>地下车库默认参数与布局规范</h3>
+                <button class="close-btn" id="close-garage-spec-modal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="spec-section">
+                    <div class="spec-header">
+                        <div>
+                            <p class="eyebrow">场景尺度与分区</p>
+                            <h4>单层四分区，统一坐标</h4>
+                            <p class="section-subtitle">原点(0,0)在西南角，X向东 180m，Y向北 120m，A/B/C/D各90m×60m</p>
+                        </div>
+                        <div class="tag-row">
+                            <span class="tag">单层地下</span>
+                            <span class="tag">主通道7m</span>
+                            <span class="tag">支路5m</span>
+                            <span class="tag">狭窄段3.2–3.6m</span>
+                        </div>
+                    </div>
+                    <div class="spec-grid">
+                        <div class="spec-card">
+                            <h5>分区口径</h5>
+                            <ul class="spec-list" id="garage-layout-details"></ul>
+                        </div>
+                        <div class="spec-card">
+                            <h5>车位生成规则</h5>
+                            <ul class="spec-list" id="garage-generation-list"></ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="spec-section">
+                    <div class="spec-header">
+                        <div>
+                            <p class="eyebrow">供能节点布局</p>
+                            <h4>就近覆盖四区，单节点单车接入</h4>
+                            <p class="section-subtitle">节点沿主通道布置，减少跨区拖线，每个节点带4m×6m安全区与状态显示</p>
+                        </div>
+                        <div class="tag-row">
+                            <span class="tag">节点互斥</span>
+                            <span class="tag">排队可见</span>
+                            <span class="tag">等待预估</span>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="spec-table">
+                            <thead>
+                                <tr>
+                                    <th>节点</th>
+                                    <th>坐标 (x,y)</th>
+                                    <th>覆盖优先区</th>
+                                    <th>设计理由</th>
+                                </tr>
+                            </thead>
+                            <tbody id="garage-node-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="spec-section">
+                    <div class="spec-header">
+                        <div>
+                            <p class="eyebrow">线缆与困难工况</p>
+                            <h4>线缆纳管，工况可高亮</h4>
+                            <p class="section-subtitle">接电状态下显示线缆，张力黄区触发降速；默认包含柱阵狭窄段、弱光段、临时障碍</p>
+                        </div>
+                        <div class="tag-row">
+                            <span class="tag">Lmax 35m</span>
+                            <span class="tag">Rsafe 30m</span>
+                            <span class="tag">张力三段</span>
+                        </div>
+                    </div>
+                    <div class="spec-grid">
+                        <div class="spec-card">
+                            <h5>线缆约束</h5>
+                            <ul class="spec-list" id="garage-cable-list"></ul>
+                        </div>
+                        <div class="spec-card">
+                            <h5>困难工况</h5>
+                            <ul class="spec-list" id="garage-difficulties-list"></ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="spec-section">
+                    <div class="spec-header">
+                        <div>
+                            <p class="eyebrow">高峰触发逻辑</p>
+                            <h4>10任务并发，必出三段戏</h4>
+                            <p class="section-subtitle">滚动调度+互斥资源+线缆约束，2分20秒内完整展示闭环</p>
+                        </div>
+                        <div class="tag-row">
+                            <span class="tag">10任务</span>
+                            <span class="tag">15秒触发窗</span>
+                            <span class="tag">C/D权重高</span>
+                        </div>
+                    </div>
+                    <div class="spec-grid">
+                        <div class="spec-card">
+                            <h5>触发参数</h5>
+                            <ul class="spec-list" id="garage-peak-parameters"></ul>
+                        </div>
+                        <div class="spec-card">
+                            <h5>必出事件</h5>
+                            <ul class="spec-list" id="garage-peak-events-list"></ul>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
